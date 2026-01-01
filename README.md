@@ -1,6 +1,6 @@
 # Runner (Web)
 
-HTML5 canvas port of the Swing game. Uses the original assets in `images/` and runs entirely as static files.
+HTML5 canvas port of the Swing game. Theme is inspired by classic Zelda: a top-down dungeon crawler with 3 unique levels, enemies that pathfind toward the player, and simple trap patterns. Uses the original assets in `images/` and runs entirely as static files.
 
 ## Local run
 ```bash
