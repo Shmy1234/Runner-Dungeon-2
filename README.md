@@ -1,21 +1,19 @@
 # Runner (Web)
 
-HTML5 canvas port of the Swing game. Theme is inspired by classic Zelda: a top-down dungeon crawler with 3 unique levels, enemies that pathfind toward the player, and simple trap patterns. Uses the original assets in `images/` and runs entirely as static files.
+Lightweight HTML5 canvas build of the runner game. Everything is contained inside `web/` with no standalone JavaScript files, so zipped copies avoid Gmail’s blocked-file rules.
+
+## Structure
+- `web/index.html`: page with inlined game script and styles
+- `web/images/`: all sprite and background assets
+- `web/favicon.png`: site icon
 
 ## Local run
+Open `web/index.html` directly in a browser, or serve the folder:
 ```bash
 cd "/Users/shmy/Downloads/fse game"
 python -m http.server 8000
+# then visit http://localhost:8000/web/
 ```
-Then open `http://localhost:8000/web/`. The canvas scales to your browser while keeping an 800x800 game space.
 
-## Deploy to Vercel
-`vercel.json` is configured to serve the `web/` folder as static files.
-
-1. Install CLI (once): `npm i -g vercel`
-2. Log in: `vercel login`
-3. From repo root, deploy:
-   - First time: `vercel` (select “Other” for framework)
-   - Production: `vercel --prod`
-
-Vercel will return the preview/prod URLs where the game is served from `web/index.html`.
+## Sharing
+Zip the `web/` folder (or the whole project) and attach it. There are no `.js`, executables, or other file types that Gmail blocks by default.
