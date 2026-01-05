@@ -1,12 +1,13 @@
 const INTRO = 0;
 const GAME = 1;
-const TUTORIAL = 2;
 const COMPLETE = 3;
 const DEATH = 4;
 const LEVEL_SELECT = 5;
 
 const BASE_W = 800;
 const BASE_H = 800;
+const TOTAL_LEVELS = 10;
+const TITLE_PALETTE = { fill: "orange", stroke: "black", text: "black" };
 
 const wallColor = 0xff33fe00 | 0;
 const exitColor = 0xfffe00e9 | 0;
@@ -42,9 +43,14 @@ class Button {
   hit(x, y) {
     return x > this.x && x < this.x + this.w && y > this.y && y < this.y + this.h;
   }
-  draw(ctx, img, state = {}, label = null) {
+  draw(ctx, img, state = {}, label = null, palette = {}) {
     const { hovered = false, active = false } = state;
     const scale = active ? 0.97 : hovered ? 1.03 : 1;
+    const {
+      fill = "#1f2430",
+      stroke = "#8af6ff",
+      text = "#e8f3ff",
+    } = palette;
     const cx = this.x + this.w / 2;
     const cy = this.y + this.h / 2;
     ctx.save();
@@ -53,14 +59,14 @@ class Button {
     if (img) {
       ctx.drawImage(img, -this.w / 2, -this.h / 2, this.w, this.h);
     } else {
-      ctx.fillStyle = "#1f2430";
+      ctx.fillStyle = fill;
       ctx.fillRect(-this.w / 2, -this.h / 2, this.w, this.h);
-      ctx.strokeStyle = "#8af6ff";
+      ctx.strokeStyle = stroke;
       ctx.lineWidth = 3;
       ctx.strokeRect(-this.w / 2, -this.h / 2, this.w, this.h);
     }
     if (label) {
-      ctx.fillStyle = "#e8f3ff";
+      ctx.fillStyle = text;
       ctx.font = "bold 28px Arial";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
@@ -291,16 +297,8 @@ class Level {
     this.y = this.py;
   }
   colorForLevel() {
-    switch (this.level) {
-      case 1:
-        return this.masks.level1;
-      case 2:
-        return this.masks.level2;
-      case 3:
-        return this.masks.level3;
-      default:
-        return this.masks.level4;
-    }
+    const idx = (this.level - 1) % this.masks.length;
+    return this.masks[idx];
   }
   clear(xx, yy, w, h) {
     const { data, width, height } = this.colorForLevel();
@@ -341,19 +339,7 @@ class Level {
       data.data[idx + 2],
       data.data[idx + 3]
     );
-    if (c !== exitColor) {
-      return false;
-    }
-    if (this.level === 4) {
-      this.levelChange(1);
-    } else if (this.level === 3) {
-      this.levelChange(4);
-    } else if (this.level === 2) {
-      this.levelChange(3);
-    } else {
-      this.levelChange(2);
-    }
-    return true;
+    return c === exitColor;
   }
   move(spikes, ghosts, keys, xx, yy, w, h) {
     if (keys[this.up] && this.clear(xx, yy - 6, w, h)) {
@@ -378,14 +364,9 @@ class Level {
     }
   }
   draw(ctx) {
-    const pic =
-      this.level === 1
-        ? this.pics.level1
-        : this.level === 2
-        ? this.pics.level2
-        : this.level === 3
-        ? this.pics.level3
-        : this.pics.level4;
+    const idx =
+      this.level - 1 < this.pics.length ? this.level - 1 : (this.level - 1) % this.pics.length;
+    const pic = this.pics[idx];
     ctx.drawImage(pic, this.x, this.y);
   }
 }
@@ -401,21 +382,19 @@ class Game {
     this.keys = {};
     this.screen = INTRO;
     this.level = 1;
-    this.hearts = 4;
+    this.hearts = 3;
     this.last = 0;
     this.assets = null;
     this.player = null;
     this.pointer = { x: null, y: null };
     this.pointerDown = false;
+    this.lastMoveDir = { x: 1, y: 0 };
+    this.dashState = { active: false, dir: { x: 1, y: 0 }, frames: 0, cooldown: 0 };
+    this.maxUnlocked = 1;
     this.button1 = new Button(300, 450, 200, 60);
     this.button2 = new Button(300, 550, 200, 60);
     this.button3 = new Button(300, 650, 200, 60);
-    this.levelButtons = [
-      { level: 1, button: new Button(140, 260, 200, 80) },
-      { level: 2, button: new Button(460, 260, 200, 80) },
-      { level: 3, button: new Button(140, 400, 200, 80) },
-      { level: 4, button: new Button(460, 400, 200, 80) },
-    ];
+    this.levelButtons = [];
     this.levelBackground = null;
     this.spikesOrganizer = null;
     this.ghostOrganizer = null;
@@ -445,6 +424,9 @@ class Game {
   setupInput() {
     window.addEventListener("keydown", (e) => {
       this.keys[e.code] = true;
+      if (e.code === "Space") {
+        this.tryDash();
+      }
     });
     window.addEventListener("keyup", (e) => {
       this.keys[e.code] = false;
@@ -474,6 +456,14 @@ class Game {
 
   async init() {
     this.assets = await this.loadAssets();
+    this.levelButtons = Array.from({ length: 10 }, (_, i) => {
+      const col = i % 2;
+      const row = Math.floor(i / 2);
+      return {
+        level: i + 1,
+        button: new Button(140 + col * 260, 240 + row * 90, 200, 70),
+      };
+    });
     this.player = new Player(
       250,
       385,
@@ -495,6 +485,80 @@ class Game {
     this.initSpikes();
     this.initGhosts();
     requestAnimationFrame((ts) => this.loop(ts));
+  }
+
+  tryDash() {
+    if (this.dashState.active || this.dashState.cooldown > 0) return;
+    let dx = (this.keys["ArrowRight"] ? 1 : 0) - (this.keys["ArrowLeft"] ? 1 : 0);
+    let dy = (this.keys["ArrowDown"] ? 1 : 0) - (this.keys["ArrowUp"] ? 1 : 0);
+    if (dx === 0 && dy === 0) {
+      dx = this.lastMoveDir.x;
+      dy = this.lastMoveDir.y;
+    }
+    if (dx === 0 && dy === 0) return;
+    const mag = Math.hypot(dx, dy);
+    dx /= mag;
+    dy /= mag;
+    this.dashState = {
+      active: true,
+      dir: { x: dx, y: dy },
+      frames: 8,
+      cooldown: 20,
+    };
+  }
+
+  moveWorld(dx, dy) {
+    const nextX = this.player.x + dx;
+    const nextY = this.player.y + dy;
+    if (this.levelBackground.clear(nextX, nextY, this.player.w, this.player.h)) {
+      this.levelBackground.x -= dx;
+      this.levelBackground.y -= dy;
+      this.spikesOrganizer.moveByPlayer(-dx, -dy);
+      this.ghostOrganizer.moveByPlayer(-dx, -dy);
+      return true;
+    }
+    return false;
+  }
+
+  handleDashStep() {
+    const step = 18;
+    const substeps = 3;
+    for (let i = 0; i < substeps; i += 1) {
+      const moved = this.moveWorld(
+        this.dashState.dir.x * (step / substeps),
+        this.dashState.dir.y * (step / substeps)
+      );
+      if (!moved) {
+        this.dashState.active = false;
+        this.dashState.frames = 0;
+        return;
+      }
+      if (
+        this.spikesOrganizer.death(
+          this.levelBackground.level,
+          this.player.x,
+          this.player.y,
+          this.player.w,
+          this.player.h
+        ) ||
+        this.ghostOrganizer.death(
+          this.levelBackground.level,
+          this.player.x,
+          this.player.y,
+          this.player.w,
+          this.player.h
+        )
+      ) {
+        this.dashState.active = false;
+        this.dashState.frames = 0;
+        this.death();
+        return;
+      }
+    }
+    this.dashState.frames -= 1;
+    if (this.dashState.frames <= 0) {
+      this.dashState.active = false;
+    }
   }
 
   buttonState(button) {
@@ -529,6 +593,16 @@ class Game {
     add(new Spikes(80, 3, 4, 2600, 900, 100, 45));
     add(new Spikes(150, 2, 4, 2200, 1380, 100, 45));
     add(new Spikes(150, 2, 4, 2600, 1500, 100, 45));
+
+    // Additional levels reuse maze pieces with slight offsets for variety
+    const extraLevels = [5, 6, 7, 8, 9, 10];
+    extraLevels.forEach((lvl, idx) => {
+      const offsetX = 200 * (idx % 3);
+      const offsetY = 150 * (idx % 2);
+      add(new Spikes(200, 2, lvl, 600 + offsetX, 400 + offsetY, 90, 45));
+      add(new Spikes(160, 3, lvl, 1100 + offsetX, 250 + offsetY, 90, 45));
+      add(new Spikes(140, 3, lvl, 1700 + offsetX, 650 + offsetY, 90, 45));
+    });
   }
 
   initGhosts() {
@@ -543,6 +617,12 @@ class Game {
     add(new Ghost(4, 1, 1640, 250, 32, 40));
     add(new Ghost(4, 1, 2700, 800, 32, 40));
     add(new Ghost(4, 1, 2300, 300, 32, 40));
+
+    const extraLevels = [5, 6, 7, 8, 9, 10];
+    extraLevels.forEach((lvl, idx) => {
+      add(new Ghost(lvl, 1, 800 + idx * 180, 380 + (idx % 2) * 120, 32, 40));
+      add(new Ghost(lvl, 1, 1800 + idx * 120, 520, 32, 40));
+    });
   }
 
   async loadAssets() {
@@ -556,12 +636,9 @@ class Game {
       level3Pic,
       level4Pic,
       introBackground,
-      tutorialBackground,
       deathBackground,
       completeBackground,
-      startPic,
       restartPic,
-      tutorialPic,
       menuPic,
       star,
       greyStar,
@@ -583,12 +660,9 @@ class Game {
       loadImage("./images/Level_3_Background.png"),
       loadImage("./images/Level_4_Background.png"),
       loadImage("./images/Castle.png"),
-      loadImage("./images/Instructions.png"),
       loadImage("./images/death_background.png"),
       loadImage("./images/complete_background.png"),
-      loadImage("./images/start.png"),
       loadImage("./images/restart.png"),
-      loadImage("./images/tutorial.png"),
       loadImage("./images/menu.png"),
       loadImage("./images/star.png"),
       loadImage("./images/grey_star.png"),
@@ -609,21 +683,38 @@ class Game {
       loadImage("./images/Knight_runRight_4.png"),
     ]);
 
+    const masks = [
+      level1Mask,
+      level2Mask,
+      level3Mask,
+      level4Mask,
+      level3Mask,
+      level4Mask,
+      level2Mask,
+      level3Mask,
+      level4Mask,
+      level1Mask,
+    ];
+    const levelPics = [
+      level1Pic,
+      level2Pic,
+      level3Pic,
+      level4Pic,
+      level3Pic,
+      level4Pic,
+      level2Pic,
+      level3Pic,
+      level4Pic,
+      level1Pic,
+    ];
+
     return {
-      masks: {
-        level1: level1Mask,
-        level2: level2Mask,
-        level3: level3Mask,
-        level4: level4Mask,
-      },
-      levelPics: { level1: level1Pic, level2: level2Pic, level3: level3Pic, level4: level4Pic },
+      masks,
+      levelPics,
       introBackground,
-      tutorialBackground,
       deathBackground,
       completeBackground,
-      startPic,
       restartPic,
-      tutorialPic,
       menuPic,
       star,
       greyStar,
@@ -650,7 +741,9 @@ class Game {
   startLevel(levelNumber) {
     this.screen = GAME;
     this.level = levelNumber;
-    this.hearts = 4;
+    this.hearts = 3;
+    this.dashState = { active: false, dir: { x: 1, y: 0 }, frames: 0, cooldown: 0 };
+    this.maxUnlocked = Math.max(this.maxUnlocked, levelNumber);
     if (this.levelBackground) {
       this.levelBackground.levelChange(levelNumber);
       this.levelBackground.reset();
@@ -667,14 +760,16 @@ class Game {
     if (this.screen === LEVEL_SELECT) {
       for (const { level, button } of this.levelButtons) {
         if (button.hit(x, y)) {
-          this.startLevel(level);
+          if (level <= this.maxUnlocked) {
+            this.startLevel(level);
+          }
           return;
         }
       }
       if (this.button2.hit(x, y)) {
         this.screen = INTRO;
         this.level = 1;
-        this.hearts = 4;
+        this.hearts = 3;
         if (this.levelBackground) {
           this.levelBackground.levelChange(1);
         }
@@ -688,16 +783,9 @@ class Game {
     }
     if (this.button2.hit(x, y)) {
       if (this.screen === INTRO) {
-        this.screen = TUTORIAL;
+        this.screen = LEVEL_SELECT;
       } else if (this.screen === COMPLETE || this.screen === DEATH) {
         this.screen = LEVEL_SELECT;
-      } else if (this.screen === TUTORIAL) {
-        this.screen = INTRO;
-        this.level = 1;
-        this.hearts = 4;
-        if (this.levelBackground) {
-          this.levelBackground.levelChange(1);
-        }
       }
     }
     if (this.button3.hit(x, y) && this.screen === INTRO) {
@@ -710,23 +798,39 @@ class Game {
     this.levelBackground.reset();
     this.ghostOrganizer.reset();
     this.spikesOrganizer.reset();
+    this.dashState = { active: false, dir: { x: this.lastMoveDir.x, y: this.lastMoveDir.y }, frames: 0, cooldown: 10 };
     if (this.hearts <= 0) {
       this.screen = DEATH;
       this.level = 1;
       this.levelBackground.levelChange(1);
+      this.hearts = 3;
     }
   }
 
   moveGame() {
-    this.levelBackground.move(
-      this.spikesOrganizer,
-      this.ghostOrganizer,
-      this.keys,
-      this.player.x,
-      this.player.y,
-      this.player.w,
-      this.player.h
-    );
+    if (this.dashState.cooldown > 0 && !this.dashState.active) {
+      this.dashState.cooldown -= 1;
+    }
+
+    if (this.dashState.active) {
+      this.handleDashStep();
+    } else {
+      const dx = (this.keys["ArrowRight"] ? 1 : 0) - (this.keys["ArrowLeft"] ? 1 : 0);
+      const dy = (this.keys["ArrowDown"] ? 1 : 0) - (this.keys["ArrowUp"] ? 1 : 0);
+      if (dx !== 0 || dy !== 0) {
+        const mag = Math.hypot(dx, dy);
+        this.lastMoveDir = { x: dx / mag, y: dy / mag };
+      }
+      this.levelBackground.move(
+        this.spikesOrganizer,
+        this.ghostOrganizer,
+        this.keys,
+        this.player.x,
+        this.player.y,
+        this.player.w,
+        this.player.h
+      );
+    }
     this.spikesOrganizer.move();
     this.ghostOrganizer.move(this.player.x, this.player.y);
     if (
@@ -751,15 +855,13 @@ class Game {
       this.levelBackground.reset();
       this.ghostOrganizer.reset();
       this.spikesOrganizer.reset();
-      if (this.level === 4) {
+      if (this.level >= TOTAL_LEVELS) {
         this.screen = COMPLETE;
         this.level = 1;
-      } else if (this.level === 3) {
-        this.level = 4;
-      } else if (this.level === 2) {
-        this.level = 3;
+        this.maxUnlocked = TOTAL_LEVELS;
       } else {
-        this.level = 2;
+        this.level += 1;
+        this.maxUnlocked = Math.max(this.maxUnlocked, this.level);
       }
       this.levelBackground.levelChange(this.level);
     }
@@ -769,13 +871,13 @@ class Game {
     const g = this.ctx;
     g.drawImage(this.assets.introBackground, 0, 0, 800, 800);
     g.fillStyle = "black";
-    g.font = "bold 170px Arial";
-    g.fillText("RUNNER", 50, 350);
+    g.font = "bold 130px Arial";
+    g.fillText("MAZE KNIGHT", 40, 330);
     g.fillStyle = "orange";
-    g.fillText("RUNNER", 40, 340);
-    this.button1.draw(g, this.assets.startPic, this.buttonState(this.button1));
-    this.button2.draw(g, this.assets.tutorialPic, this.buttonState(this.button2));
-    this.button3.draw(g, null, this.buttonState(this.button3), "Levels");
+    g.fillText("MAZE KNIGHT", 32, 320);
+    this.button1.draw(g, null, this.buttonState(this.button1), "Start", TITLE_PALETTE);
+    this.button2.draw(g, null, this.buttonState(this.button2), "Menu", TITLE_PALETTE);
+    this.button3.draw(g, null, this.buttonState(this.button3), "Levels", TITLE_PALETTE);
   }
 
   drawGame() {
@@ -796,20 +898,7 @@ class Game {
     if (this.hearts > 2) {
       g.drawImage(this.assets.heart, 320, 30, 100, 100);
     }
-    if (this.hearts > 3) {
-      g.drawImage(this.assets.heart, 460, 30, 100, 100);
-    }
-  }
-
-  drawTutorial() {
-    const g = this.ctx;
-    g.drawImage(this.assets.tutorialBackground, 0, 0, 800, 800);
-    g.fillStyle = "black";
-    g.font = "bold 120px Arial";
-    g.fillText("Tutorial", 200, 200);
-    g.fillStyle = "blue";
-    g.fillText("Tutorial", 208, 190);
-    this.button2.draw(g, this.assets.menuPic, this.buttonState(this.button2));
+    // maximum of 3 hearts now
   }
 
   drawLevelSelect() {
@@ -823,23 +912,31 @@ class Game {
     g.fillStyle = "#00c9ff";
     g.fillText("Select Level", 112, 182);
     this.levelButtons.forEach(({ level, button }) => {
-      button.draw(g, null, this.buttonState(button), `Level ${level}`);
+      const unlocked = level <= this.maxUnlocked;
+      const palette = unlocked
+        ? TITLE_PALETTE
+        : { fill: "#333", stroke: "#111", text: "#777" };
+      const label = unlocked ? `Level ${level}` : "Locked";
+      button.draw(g, null, this.buttonState(button), label, palette);
     });
-    this.button2.draw(g, this.assets.menuPic, this.buttonState(this.button2));
+    const originalY = this.button2.y;
+    this.button2.y = 710;
+    this.button2.draw(g, null, this.buttonState(this.button2), "Menu", TITLE_PALETTE);
+    this.button2.y = originalY;
   }
 
   drawComplete() {
     const g = this.ctx;
     g.drawImage(this.assets.completeBackground, 0, 0, 800, 800);
-    if (this.hearts === 4) {
+    if (this.hearts >= 3) {
       g.drawImage(this.assets.star, 50, 50, 200, 200);
       g.drawImage(this.assets.star, 300, 50, 200, 200);
       g.drawImage(this.assets.star, 550, 50, 200, 200);
-    } else if (this.hearts === 3) {
+    } else if (this.hearts === 2) {
       g.drawImage(this.assets.star, 50, 50, 200, 200);
       g.drawImage(this.assets.star, 300, 50, 200, 200);
       g.drawImage(this.assets.greyStar, 560, 50, 200, 200);
-    } else if (this.hearts === 2) {
+    } else if (this.hearts === 1) {
       g.drawImage(this.assets.star, 50, 50, 200, 200);
       g.drawImage(this.assets.greyStar, 300, 50, 200, 200);
       g.drawImage(this.assets.greyStar, 550, 50, 200, 200);
@@ -854,7 +951,7 @@ class Game {
     g.fillStyle = "yellow";
     g.fillText("Congratulations", 154, 400);
     this.button1.draw(g, this.assets.restartPic, this.buttonState(this.button1));
-    this.button2.draw(g, this.assets.menuPic, this.buttonState(this.button2));
+    this.button2.draw(g, null, this.buttonState(this.button2), "Menu", TITLE_PALETTE);
   }
 
   drawDeath() {
@@ -866,14 +963,13 @@ class Game {
     g.fillStyle = "blue";
     g.fillText("Try Again", 108, 342);
     this.button1.draw(g, this.assets.restartPic, this.buttonState(this.button1));
-    this.button2.draw(g, this.assets.menuPic, this.buttonState(this.button2));
+    this.button2.draw(g, null, this.buttonState(this.button2), "Menu", TITLE_PALETTE);
   }
 
   draw() {
     if (!this.assets) return;
     if (this.screen === INTRO) this.drawIntro();
     else if (this.screen === GAME) this.drawGame();
-    else if (this.screen === TUTORIAL) this.drawTutorial();
     else if (this.screen === COMPLETE) this.drawComplete();
     else if (this.screen === DEATH) this.drawDeath();
     else if (this.screen === LEVEL_SELECT) this.drawLevelSelect();
