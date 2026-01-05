@@ -8,6 +8,7 @@ const BASE_W = 800;
 const BASE_H = 800;
 const TOTAL_LEVELS = 10;
 const TITLE_PALETTE = { fill: "orange", stroke: "black", text: "black" };
+const RETRY_PALETTE = { fill: "blue", stroke: "black", text: "black" };
 
 const wallColor = 0xff33fe00 | 0;
 const exitColor = 0xfffe00e9 | 0;
@@ -871,10 +872,12 @@ class Game {
     const g = this.ctx;
     g.drawImage(this.assets.introBackground, 0, 0, 800, 800);
     g.fillStyle = "black";
-    g.font = "bold 130px Arial";
-    g.fillText("MAZE KNIGHT", 40, 330);
+    g.font = "bold 90px Arial";
+    g.textAlign = "center";
+    g.fillText("MAZE KNIGHT", 400, 300);
     g.fillStyle = "orange";
-    g.fillText("MAZE KNIGHT", 32, 320);
+    g.fillText("MAZE KNIGHT", 392, 292);
+    g.textAlign = "left";
     this.button1.draw(g, null, this.buttonState(this.button1), "Start", TITLE_PALETTE);
     this.button2.draw(g, null, this.buttonState(this.button2), "Menu", TITLE_PALETTE);
     this.button3.draw(g, null, this.buttonState(this.button3), "Levels", TITLE_PALETTE);
@@ -950,7 +953,7 @@ class Game {
     g.fillText("Congratulations", 160, 410);
     g.fillStyle = "yellow";
     g.fillText("Congratulations", 154, 400);
-    this.button1.draw(g, this.assets.restartPic, this.buttonState(this.button1));
+    this.button1.draw(g, null, this.buttonState(this.button1), "Restart", RETRY_PALETTE);
     this.button2.draw(g, null, this.buttonState(this.button2), "Menu", TITLE_PALETTE);
   }
 
@@ -962,7 +965,7 @@ class Game {
     g.fillText("Try Again", 100, 350);
     g.fillStyle = "blue";
     g.fillText("Try Again", 108, 342);
-    this.button1.draw(g, this.assets.restartPic, this.buttonState(this.button1));
+    this.button1.draw(g, null, this.buttonState(this.button1), "Restart", RETRY_PALETTE);
     this.button2.draw(g, null, this.buttonState(this.button2), "Menu", TITLE_PALETTE);
   }
 
