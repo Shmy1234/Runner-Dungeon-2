@@ -1,19 +1,22 @@
-# Runner (Web)
+# Maze Knight
 
-Lightweight HTML5 canvas build of the runner game. Everything is contained inside `web/` with no standalone JavaScript files, so zipped copies avoid Gmail’s blocked-file rules.
+HTML5 canvas maze runner with keyboard and mouse controls.
 
 ## Structure
-- `web/index.html`: page with inlined game script and styles
-- `web/images/`: all sprite and background assets
-- `web/favicon.png`: site icon
+- `index.html`: page entry
+- `style.css`: layout and canvas styling
+- `game.js`: game logic
+- `images/`: sprites and backgrounds
+- `favicon.png`: site icon
 
 ## Local run
-Open `web/index.html` directly in a browser, or serve the folder:
+Serve the folder and open the local URL:
 ```bash
 cd "/Users/shmy/Downloads/fse game"
 python -m http.server 8000
-# then visit http://localhost:8000/web/
 ```
+Open `http://localhost:8000/` in a browser.
 
-## Sharing
-Zip the `web/` folder (or the whole project) and attach it. There are no `.js`, executables, or other file types that Gmail blocks by default.
+## Deploy to Vercel
+1) Import the repo in Vercel or run `vercel` from this folder.
+2) No build step is required; it deploys as a static site.

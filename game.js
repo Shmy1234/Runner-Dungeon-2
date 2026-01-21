@@ -268,7 +268,7 @@ class GhostOrganizer {
   draw(ctx, level) {
     this.ghosts.forEach((g) => {
       if (g.level === level) {
-        const img = g.direction === 1 ? this.leftImg : this.rightImg;
+        const img = g.direction === 1 ? this.rightImg : this.leftImg;
         ctx.drawImage(img, g.x, g.y, g.w, g.h);
       }
     });
@@ -595,7 +595,6 @@ class Game {
     add(new Spikes(150, 2, 4, 2200, 1380, 100, 45));
     add(new Spikes(150, 2, 4, 2600, 1500, 100, 45));
 
-    // Additional levels reuse maze pieces with slight offsets for variety
     const extraLevels = [5, 6, 7, 8, 9, 10];
     extraLevels.forEach((lvl, idx) => {
       const offsetX = 200 * (idx % 3);
@@ -901,7 +900,6 @@ class Game {
     if (this.hearts > 2) {
       g.drawImage(this.assets.heart, 320, 30, 100, 100);
     }
-    // maximum of 3 hearts now
   }
 
   drawLevelSelect() {
