@@ -3,11 +3,11 @@
 HTML5 canvas maze runner with keyboard and mouse controls.
 
 ## Structure
-- `index.html`: page entry
-- `style.css`: layout and canvas styling
-- `game.js`: game logic
-- `images/`: sprites and backgrounds
-- `favicon.png`: site icon
+- `web/index.html`: page entry
+- `web/style.css`: layout and canvas styling
+- `web/game.js`: game logic
+- `web/images/`: sprites and backgrounds
+- `web/favicon.png`: site icon
 
 ## Local run
 Serve the folder and open the local URL:
@@ -15,7 +15,7 @@ Serve the folder and open the local URL:
 cd "/Users/shmy/Downloads/fse game"
 python -m http.server 8000
 ```
-Open `http://localhost:8000/` in a browser.
+Open `http://localhost:8000/` (redirects to `/web/`).
 
 ## Deploy to Vercel
 1) Import the repo in Vercel or run `vercel` from this folder.
